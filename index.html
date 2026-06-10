@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 스터디 2주차 — API를 활용한 데이터 연동과 구글시트 정제</title>
+
+<!-- ============================================================
+     FONTS
+     Pretendard: 가장 깔끔하고 가독성 높은 한국어 본문/제목 폰트
+     JetBrains Mono: 프롬프트/코드 카드의 라틴·숫자 표현용
+     ============================================================ -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap">
+
+<style>
+/* ============================================================
+   CSS 변수 (테마)
+   이 값들만 바꾸면 전체 디자인이 바뀝니다.
+   ============================================================ */
+:root {
+    /* 색상 — 차분한 교육자료 팔레트 */
+    --stage-bg:    #e9edf3;   /* 무대 바깥 레터박스 배경 */
+    --slide-bg:    #ffffff;   /* 슬라이드 바탕 */
+    --ink:         #16202e;   /* 가장 진한 본문/제목 */
+    --ink-soft:    #46566a;   /* 보조 본문 */
+    --ink-faint:   #8a98a8;   /* 캡션/라벨 */
+    --line:        #e4e9f0;   /* 경계선 */
+    --panel:       #f5f7fb;   /* 카드/패널 바탕 */
+
+    --blue:        #2f6fed;   /* 메인 액센트 (블루) */
+    --blue-deep:   #1a4fc4;
+    --blue-tint:   #eaf1ff;   /* 블루 연한 배경 */
+    --coral:       #fa7a83;   /* 포인트 1 (코랄) */
+    --coral-tint:  #fff0f1;
+    --amber:       #f6b73c;   /* 포인트 2 (옐로우) */
+    --amber-tint:  #fff6e4;
+    --mint:        #18b486;   /* 포인트 3 (그린) */
+    --mint-tint:   #e6f7f1;
+
+    /* 타이포 — 1920×1080 무대 기준 절대 크기 */
+    --font:        'Pretendard', sans-serif;
+    --mono:        'JetBrains Mono', monospace;
+
+    /* 모션 */
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur: 0.7s;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ============================================================
+   viewport-base.css (필수 고정 무대 스타일 — 전체 포함)
+   슬라이드는 1920×1080으로 작성되고 무대 전체가 스케일됩니다.
+   ============================================================ */
+html, body {
+    width: 100%; height: 100%;
+    margin: 0; overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+.deck-viewport {
+    position: fixed; inset: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+.deck-stage {
+    position: absolute; left: 0; top: 0;
+    width: 1920px; height: 1080px;
+    overflow: hidden;
+    transform-origin: 0 0;
+    background: var(--slide-bg, #fff);
+}
+.slide {
+    position: absolute; inset: 0;
+    width: 1920px; height: 1080px;
+    overflow: hidden;
+    display: block;
+    visibility: hidden; opacity: 0; pointer-events: none;
+    background: var(--slide-bg, #fff);
+}
+.slide.active, .slide.visible {
+    visibility: visible; opacity: 1; pointer-events: auto; z-index: 1;
+}
+img, video, canvas, svg { max-width: 100%; max-height: 100%; }
+.deck-controls {
+    position: fixed; left: 50%; bottom: 22px;
+    transform: translateX(-50%); z-index: 1000;
+}
+@media print {
+    html, body { width: 1920px; height: auto; overflow: visible; background: #fff; }
+    .deck-viewport { position: static; overflow: visible; background: #fff; }
+    .deck-stage { position: static; width: auto; height: auto; transform: none !important; background: none; }
+    .slide {
+        position: relative; display: block !important;
+        visibility: visible !important; opacity: 1 !important; pointer-events: auto !important;
+        width: 1920px; height: 1080px; break-after: page; page-break-after: always;
+    }
+    .slide:last-child { break-after: auto; page-break-after: auto; }
+    .deck-controls { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.2s !important;
+    }
+}
+
+/* ============================================================
+   슬라이드 공통 레이아웃
+   ============================================================ */
+.slide {
+    font-family: var(--font);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+}
+.pad {
+    position: absolute; inset: 0;
+    padding: 104px 132px 116px;
+    display: flex; flex-direction: column;
+}
+.pad.center { justify-content: center; }
+
+/* 상단 키커(섹션 라벨) + 하단 페이지 표시 */
+.kicker {
+    display: inline-flex; align-items: center; gap: 14px;
+    font-size: 23px; font-weight: 700; letter-spacing: 0.04em;
+    color: var(--blue);
+    margin-bottom: 26px;
+}
+.kicker::before {
+    content: ""; width: 38px; height: 5px; border-radius: 3px;
+    background: var(--blue);
+}
+.foot {
+    position: absolute; left: 132px; right: 132px; bottom: 52px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 20px; color: var(--ink-faint); font-weight: 600;
+}
+.foot .brand { letter-spacing: 0.02em; }
+.foot .pg { font-family: var(--mono); font-weight: 700; }
+
+/* 제목 / 본문 타이포 */
+h2.title {
+    font-size: 74px; font-weight: 800; line-height: 1.12;
+    letter-spacing: -0.02em; color: var(--ink);
+}
+.lead {
+    font-size: 32px; font-weight: 500; line-height: 1.55;
+    color: var(--ink-soft); max-width: 1300px;
+}
+
+/* 핵심 메시지 큰 문장 */
+.coremsg {
+    font-size: 50px; font-weight: 800; line-height: 1.3;
+    letter-spacing: -0.02em; color: var(--ink);
+}
+.coremsg .hl { color: var(--blue); }
+
+/* 강조 인용/콜아웃 */
+.callout {
+    border-left: 8px solid var(--blue);
+    background: var(--blue-tint);
+    border-radius: 0 18px 18px 0;
+    padding: 34px 44px;
+    font-size: 36px; font-weight: 700; line-height: 1.4;
+    color: var(--blue-deep);
+}
+.callout.coral { border-color: var(--coral); background: var(--coral-tint); color: #c64850; }
+.callout.amber { border-color: var(--amber); background: var(--amber-tint); color: #a9710c; }
+
+/* 큰 강조 박스(중앙) */
+.bigbox {
+    background: var(--ink);
+    border-radius: 24px;
+    padding: 46px 56px;
+    display: flex; align-items: center; gap: 30px;
+    box-shadow: 0 26px 60px -28px rgba(22,32,46,.5);
+}
+.bigbox .ic { font-size: 56px; line-height: 1; }
+.bigbox .txt { font-size: 40px; font-weight: 800; color: #fff; line-height: 1.3; }
+.bigbox .txt .key { color: var(--amber); }
+
+/* 불릿 리스트 */
+ul.bullets { list-style: none; display: flex; flex-direction: column; gap: 22px; }
+ul.bullets li {
+    position: relative; padding-left: 46px;
+    font-size: 31px; font-weight: 500; line-height: 1.45; color: var(--ink-soft);
+}
+ul.bullets li::before {
+    content: ""; position: absolute; left: 6px; top: 14px;
+    width: 16px; height: 16px; border-radius: 5px;
+    background: var(--blue);
+}
+ul.bullets.q li::before { background: var(--coral); border-radius: 50%; }
+
+/* ============================================================
+   카드 그리드
+   ============================================================ */
+.grid { display: grid; gap: 28px; }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.g2 { grid-template-columns: repeat(2, 1fr); }
+
+.card {
+    background: var(--slide-bg);
+    border: 2px solid var(--line);
+    border-radius: 22px;
+    padding: 38px 38px 40px;
+    display: flex; flex-direction: column; gap: 16px;
+    transition: transform .35s var(--ease), box-shadow .35s var(--ease), border-color .35s var(--ease);
+}
+.card:hover { transform: translateY(-8px); box-shadow: 0 24px 50px -24px rgba(22,32,46,.28); border-color: var(--blue); }
+.card .num {
+    width: 56px; height: 56px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 800; font-family: var(--mono);
+    background: var(--blue-tint); color: var(--blue);
+}
+.card .ic { font-size: 46px; line-height: 1; }
+.card h3 { font-size: 34px; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
+.card p { font-size: 26px; font-weight: 500; line-height: 1.5; color: var(--ink-soft); }
+
+/* 액센트 변형 */
+.card.c-coral .num { background: var(--coral-tint); color: var(--coral); }
+.card.c-amber .num { background: var(--amber-tint); color: #c98a10; }
+.card.c-mint  .num { background: var(--mint-tint);  color: var(--mint); }
+.card.c-coral:hover { border-color: var(--coral); }
+.card.c-amber:hover { border-color: var(--amber); }
+.card.c-mint:hover  { border-color: var(--mint); }
+
+/* 작은 예시 칩 */
+.chips { display: flex; flex-wrap: wrap; gap: 18px; }
+.chip {
+    display: inline-flex; align-items: center; gap: 12px;
+    background: var(--panel); border: 2px solid var(--line);
+    border-radius: 999px; padding: 16px 30px;
+    font-size: 27px; font-weight: 700; color: var(--ink);
+}
+.chip .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--blue); }
+
+/* ============================================================
+   흐름도 (가로 노드 + 화살표)
+   ============================================================ */
+.flow { display: flex; align-items: stretch; justify-content: center; gap: 0; }
+.flow-node {
+    flex: 1; max-width: 420px;
+    background: var(--panel); border: 2px solid var(--line);
+    border-radius: 22px; padding: 44px 30px;
+    display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center;
+}
+.flow-node .ic { font-size: 64px; line-height: 1; }
+.flow-node .lab { font-size: 32px; font-weight: 800; color: var(--ink); }
+.flow-node .sub { font-size: 23px; font-weight: 500; color: var(--ink-faint); }
+.flow-arrow {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 60px; color: var(--blue); font-weight: 800;
+    padding: 0 24px; flex: 0 0 auto;
+}
+
+/* ============================================================
+   세로 단계 흐름(플로우차트)
+   ============================================================ */
+.steps { display: grid; grid-template-columns: 1fr 1fr; gap: 26px 60px; }
+.step {
+    display: flex; align-items: flex-start; gap: 26px;
+    position: relative;
+}
+.step .sn {
+    flex: 0 0 auto;
+    width: 64px; height: 64px; border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 30px; font-weight: 700;
+    background: var(--blue); color: #fff;
+    box-shadow: 0 10px 22px -10px rgba(47,111,237,.7);
+}
+.step .sc { padding-top: 6px; }
+.step .sc .st { font-size: 30px; font-weight: 700; color: var(--ink); line-height: 1.4; }
+
+/* ============================================================
+   비교표
+   ============================================================ */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.col {
+    border: 2px solid var(--line); border-radius: 22px; overflow: hidden;
+    display: flex; flex-direction: column;
+}
+.col .head {
+    padding: 28px 36px; display: flex; align-items: center; gap: 16px;
+    font-size: 38px; font-weight: 800; color: #fff;
+}
+.col.api .head { background: var(--blue); }
+.col.crawl .head { background: var(--ink-soft); }
+.col .head .ic { font-size: 40px; }
+.col ul { list-style: none; padding: 30px 36px 34px; display: flex; flex-direction: column; gap: 20px; }
+.col ul li {
+    position: relative; padding-left: 40px;
+    font-size: 27px; font-weight: 500; line-height: 1.4; color: var(--ink-soft);
+}
+.col ul li::before {
+    content: "✓"; position: absolute; left: 4px; top: 0;
+    font-weight: 800; font-size: 25px;
+}
+.col.api ul li::before { content: "✓"; color: var(--blue); }
+.col.crawl ul li::before { content: "△"; color: var(--ink-faint); }
+
+/* ============================================================
+   프롬프트 카드 (복사 가능)
+   ============================================================ */
+.prompt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.prompt {
+    background: #0f1925; border-radius: 20px;
+    padding: 30px 32px 30px;
+    display: flex; flex-direction: column; gap: 14px;
+    position: relative; overflow: hidden;
+}
+.prompt::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
+    background: var(--blue);
+}
+.prompt .ptop { display: flex; align-items: center; justify-content: space-between; }
+.prompt .ptag {
+    font-family: var(--mono); font-size: 19px; font-weight: 700;
+    color: #7fa9ff; letter-spacing: 0.06em;
+}
+.prompt .ptxt {
+    font-size: 24px; font-weight: 500; line-height: 1.5; color: #e7edf6;
+}
+.prompt .ptxt .v { color: var(--amber); font-weight: 700; }
+.copybtn {
+    background: rgba(255,255,255,.1); color: #cdd9ea;
+    border: none; border-radius: 9px; padding: 8px 16px;
+    font-size: 18px; font-weight: 700; font-family: var(--font);
+    cursor: pointer; transition: background .25s, color .25s;
+}
+.copybtn:hover { background: var(--blue); color: #fff; }
+.copybtn.done { background: var(--mint); color: #fff; }
+
+/* 단일 큰 예시 카드 */
+.exbox {
+    background: var(--panel); border: 2px dashed var(--blue);
+    border-radius: 20px; padding: 34px 40px;
+    font-size: 30px; font-weight: 600; line-height: 1.55; color: var(--ink);
+}
+.exbox .q { color: var(--blue); font-weight: 800; }
+
+/* 체크리스트 */
+.checks { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 50px; }
+.check {
+    display: flex; align-items: center; gap: 22px;
+    background: var(--panel); border: 2px solid var(--line);
+    border-radius: 16px; padding: 24px 30px;
+    font-size: 29px; font-weight: 600; color: var(--ink);
+}
+.check .box {
+    flex: 0 0 auto; width: 40px; height: 40px; border-radius: 10px;
+    background: var(--mint-tint); color: var(--mint);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: 800;
+}
+
+/* ============================================================
+   표지
+   ============================================================ */
+.cover { background: linear-gradient(155deg, #16202e 0%, #1e3a6e 60%, #2f6fed 130%); }
+.cover .pad { padding: 132px 132px; }
+.cover .badge {
+    align-self: flex-start;
+    display: inline-flex; align-items: center; gap: 14px;
+    background: rgba(255,255,255,.12); border: 1.5px solid rgba(255,255,255,.3);
+    color: #dce8ff; border-radius: 999px; padding: 16px 30px;
+    font-size: 25px; font-weight: 700; letter-spacing: 0.02em;
+    backdrop-filter: blur(4px);
+}
+.cover h1 {
+    margin-top: auto;
+    font-size: 104px; font-weight: 800; line-height: 1.1;
+    letter-spacing: -0.03em; color: #fff;
+}
+.cover .sub {
+    margin-top: 34px; font-size: 38px; font-weight: 500; color: #b9cdf2; line-height: 1.4;
+}
+.cover .rule { margin-top: 46px; width: 130px; height: 7px; border-radius: 4px; background: var(--amber); }
+.cover .meta {
+    margin-top: auto; display: flex; gap: 16px; align-items: center;
+    font-size: 24px; font-weight: 600; color: #93aede;
+}
+.cover .meta .sep { opacity: .5; }
+/* 표지 장식 도형 */
+.cover .orb {
+    position: absolute; border-radius: 50%; filter: blur(2px); opacity: .5;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.35), transparent 70%);
+}
+.cover .orb.o1 { width: 520px; height: 520px; right: -120px; top: -120px; }
+.cover .orb.o2 { width: 300px; height: 300px; right: 360px; bottom: -120px; background: radial-gradient(circle at 30% 30%, rgba(246,183,60,.5), transparent 70%); }
+
+/* 마무리 슬라이드 */
+.closing { background: linear-gradient(155deg, #16202e 0%, #203a5f 100%); }
+.closing .kicker { color: #7fa9ff; }
+.closing .kicker::before { background: #7fa9ff; }
+.closing h2.title { color: #fff; }
+.closing .lead { color: #b9cdf2; }
+.closing .finalq {
+    background: rgba(255,255,255,.06);
+    border: 1.5px solid rgba(255,255,255,.18);
+    border-left: 8px solid var(--amber);
+    border-radius: 0 20px 20px 0;
+    padding: 40px 50px;
+    font-size: 44px; font-weight: 800; line-height: 1.3; color: #fff;
+}
+.closing .finalq .y { color: var(--amber); }
+.closing .foot { color: #7388a5; }
+
+/* ============================================================
+   진입 애니메이션 (.visible 클래스 트리거)
+   ============================================================ */
+.reveal {
+    opacity: 0; transform: translateY(34px);
+    transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.slide.visible .reveal { opacity: 1; transform: translateY(0); }
+.slide.visible .reveal:nth-child(1) { transition-delay: .05s; }
+.slide.visible .reveal:nth-child(2) { transition-delay: .15s; }
+.slide.visible .reveal:nth-child(3) { transition-delay: .25s; }
+.slide.visible .reveal:nth-child(4) { transition-delay: .35s; }
+.slide.visible .reveal:nth-child(5) { transition-delay: .45s; }
+.slide.visible .reveal:nth-child(6) { transition-delay: .55s; }
+/* 그리드 자식 스태거 (data-stagger 사용) */
+.slide.visible [data-st="1"] { transition-delay: .15s; }
+.slide.visible [data-st="2"] { transition-delay: .27s; }
+.slide.visible [data-st="3"] { transition-delay: .39s; }
+.slide.visible [data-st="4"] { transition-delay: .51s; }
+.slide.visible [data-st="5"] { transition-delay: .63s; }
+.slide.visible [data-st="6"] { transition-delay: .75s; }
+.slide.visible [data-st="7"] { transition-delay: .87s; }
+.slide.visible [data-st="8"] { transition-delay: .99s; }
+
+/* ============================================================
+   상단 진행 막대 + 편집 버튼 (무대 바깥 chrome)
+   ============================================================ */
+#progress {
+    position: fixed; top: 0; left: 0; height: 5px; width: 0%;
+    background: var(--blue); z-index: 1000;
+    transition: width .4s var(--ease);
+}
+.edit-hotzone { position: fixed; top: 0; left: 0; width: 80px; height: 80px; z-index: 10000; cursor: pointer; }
+.edit-toggle {
+    position: fixed; top: 16px; left: 16px; z-index: 10001;
+    width: 50px; height: 50px; border-radius: 12px; border: none; cursor: pointer;
+    background: #fff; box-shadow: 0 6px 20px -6px rgba(0,0,0,.3); font-size: 22px;
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+.edit-toggle.show, .edit-toggle.active { opacity: 1; pointer-events: auto; }
+.edit-toggle.active { background: var(--blue); }
+body.editing [contenteditable="true"]:hover { outline: 2px dashed var(--blue); outline-offset: 4px; border-radius: 4px; }
+body.editing [contenteditable="true"]:focus { outline: 2px solid var(--blue); outline-offset: 4px; background: var(--blue-tint); }
+#editHint {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 12px 24px; border-radius: 999px;
+    font-family: var(--font); font-size: 17px; font-weight: 600; z-index: 10001;
+    opacity: 0; pointer-events: none; transition: opacity .3s; white-space: nowrap;
+}
+#editHint.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+<div class="edit-hotzone"></div>
+<button class="edit-toggle" id="editToggle" title="편집 모드 (E)">✏️</button>
+<div id="editHint">편집 모드 — 텍스트를 클릭해 수정하고 Ctrl+S로 저장</div>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+    <!-- ========================================================
+         SLIDE 1 — 표지
+         핵심: 이번 주 주제를 한눈에
+         ======================================================== -->
+    <section class="slide cover active">
+        <div class="orb o1"></div>
+        <div class="orb o2"></div>
+        <div class="pad">
+            <div class="badge reveal">AI 스터디 · 2주차</div>
+            <h1 class="reveal">API를 활용한 데이터 연동과<br>구글시트 정제</h1>
+            <div class="rule reveal"></div>
+            <p class="sub reveal">원하는 데이터를 찾아서 시트로 가져오기</p>
+            <div class="meta reveal">
+                <span>비개발자 · 초급자 대상</span>
+                <span class="sep">|</span>
+                <span>실습 중심 교육자료</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 2 — 지난주 복습
+         핵심: 지난주엔 "이미 있는 데이터"를 화면에 출력했다
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">지난주 복습</div>
+            <h2 class="title reveal">지난주에는 이미 정리된 데이터를<br>화면에 <span style="color:var(--blue)">출력</span>했습니다</h2>
+
+            <ul class="bullets reveal" style="margin-top:44px; max-width:1200px;">
+                <li>구글시트에 데이터를 표(CSV) 형태로 정리했습니다.</li>
+                <li>Apps Script로 시트의 데이터를 읽어왔습니다.</li>
+                <li>웹앱으로 배포해 데이터를 화면에 보여주었습니다.</li>
+            </ul>
+
+            <div class="flow reveal" style="margin-top:auto; margin-bottom:20px;">
+                <div class="flow-node"><div class="ic">📊</div><div class="lab">Google Sheet</div><div class="sub">데이터 정리</div></div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node"><div class="ic">⚙️</div><div class="lab">Apps Script</div><div class="sub">데이터 읽기</div></div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node"><div class="ic">🖥️</div><div class="lab">Web Page</div><div class="sub">화면에 출력</div></div>
+            </div>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">02</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 3 — 이번 주의 핵심 질문
+         핵심: 데이터는 꼭 직접 입력해야 할까?
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad center">
+            <div class="kicker reveal">이번 주의 핵심 질문</div>
+            <h2 class="title reveal" style="font-size:88px;">데이터는 꼭<br><span style="color:var(--coral)">직접 입력</span>해야 할까요?</h2>
+
+            <ul class="bullets q reveal" style="margin-top:50px; max-width:1300px; font-size:33px;">
+                <li>외부에 이미 존재하는 데이터를 가져올 수 있을까?</li>
+                <li>내가 원하는 데이터에 사용할 수 있는 API가 있을까?</li>
+                <li>그 데이터를 구글시트로 연결할 수 있을까?</li>
+                <li>가져온 데이터를 어떻게 정리해야 보기 좋을까?</li>
+            </ul>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">03</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 4 — 데이터를 가져오는 3가지 방법
+         핵심: CSV · API · 크롤링
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">데이터를 가져오는 대표적인 방법</div>
+            <h2 class="title reveal">데이터를 가져오는 <span style="color:var(--blue)">3가지 방법</span></h2>
+
+            <div class="grid g3 reveal" style="margin-top:auto; margin-bottom:30px;">
+                <div class="card" data-st="1">
+                    <div class="num">01</div>
+                    <h3>CSV / 구글시트</h3>
+                    <p>이미 표 형태로 정리된 데이터를 그대로 가져오는 방식</p>
+                </div>
+                <div class="card c-coral" data-st="2">
+                    <div class="num">02</div>
+                    <h3>API</h3>
+                    <p>서비스나 기관이 제공하는 공식 데이터 통로를 사용하는 방식</p>
+                </div>
+                <div class="card c-amber" data-st="3">
+                    <div class="num">03</div>
+                    <h3>크롤링 / 자동화</h3>
+                    <p>웹페이지에 보이는 정보를 자동으로 수집하는 방식</p>
+                </div>
+            </div>
+            <p class="lead reveal" style="font-size:28px;">👉 이번 수업에서는 <b style="color:var(--coral)">API</b>로 외부 데이터를 구글시트에 연결하는 방법을 실습합니다.</p>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">04</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 5 — 지난주 방식: CSV/구글시트
+         핵심: 가장 쉬운 시작점
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">지난주 방식 · CSV / 구글시트</div>
+            <h2 class="title reveal">CSV·구글시트는 가장 쉬운 <span style="color:var(--blue)">시작점</span></h2>
+
+            <div class="grid g2 reveal" style="margin-top:44px;">
+                <ul class="bullets" data-st="1">
+                    <li>구조가 단순합니다.</li>
+                    <li>표 형태라 이해하기 쉽습니다.</li>
+                    <li>직접 입력하거나 파일을 업데이트할 수 있습니다.</li>
+                </ul>
+                <ul class="bullets" data-st="2">
+                    <li>내부 관리표 · 명단 · 일정표에 적합합니다.</li>
+                    <li>교육용 샘플 데이터로 쓰기 좋습니다.</li>
+                </ul>
+            </div>
+
+            <div class="callout reveal" style="margin-top:auto;">“이미 정리된 데이터를 활용하는 방식”</div>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">05</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 6 — 이번주 방식: API
+         핵심: 외부 데이터를 가져오는 공식 통로
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">이번 주 방식 · API</div>
+            <h2 class="title reveal">API는 외부 데이터를 가져오는 <span style="color:var(--blue)">공식 통로</span></h2>
+            <p class="lead reveal" style="margin-top:24px;">서비스나 기관이 정해둔 규칙에 따라 데이터를 <b>요청하고 받아오는</b> 방법입니다.</p>
+
+            <div class="chips reveal" style="margin-top:40px;">
+                <span class="chip"><span class="dot"></span>날씨</span>
+                <span class="chip"><span class="dot"></span>뉴스</span>
+                <span class="chip"><span class="dot"></span>도서 검색</span>
+                <span class="chip"><span class="dot"></span>영화 정보</span>
+                <span class="chip"><span class="dot"></span>환율</span>
+                <span class="chip"><span class="dot"></span>공공데이터</span>
+                <span class="chip"><span class="dot"></span>지역 행사</span>
+                <span class="chip"><span class="dot"></span>유튜브</span>
+            </div>
+
+            <div class="callout reveal" style="margin-top:auto;">“API를 사용하면 외부 데이터를 구글시트로 <b>자동 연결</b>할 수 있다.”</div>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">06</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 7 — API 사용 기본 흐름 (플로우차트)
+         핵심: 6단계
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">API 사용 기본 흐름</div>
+            <h2 class="title reveal">API를 구글시트에 연결하는 <span style="color:var(--blue)">흐름</span></h2>
+
+            <div class="steps reveal" style="margin-top:auto; margin-bottom:20px;">
+                <div class="step" data-st="1"><div class="sn">1</div><div class="sc"><div class="st">가져오고 싶은 데이터를 정한다</div></div></div>
+                <div class="step" data-st="2"><div class="sn">2</div><div class="sc"><div class="st">사용할 수 있는 API가 있는지 찾는다</div></div></div>
+                <div class="step" data-st="3"><div class="sn">3</div><div class="sc"><div class="st">무료 여부 · 인증키 필요 여부를 확인한다</div></div></div>
+                <div class="step" data-st="4"><div class="sn">4</div><div class="sc"><div class="st">문서에서 요청 주소·응답 형식을 확인한다</div></div></div>
+                <div class="step" data-st="5"><div class="sn">5</div><div class="sc"><div class="st">Apps Script로 API를 호출한다</div></div></div>
+                <div class="step" data-st="6"><div class="sn">6</div><div class="sc"><div class="st">필요한 항목만 골라 구글시트에 정리한다</div></div></div>
+            </div>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">07</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 8 — GPT/Gemini에게 물어보는 방법
+         핵심: 직접 검색 대신 AI에게 대화형으로 물어보기
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">GPT · Gemini 활용</div>
+            <h2 class="title reveal" style="font-size:64px;">AI에게 이렇게 물어보면 됩니다</h2>
+            <p class="lead reveal" style="margin-top:14px; font-size:27px;">API를 직접 검색하고 문서를 해석하기 어렵다면, <b>대화형으로 물어보며</b> 진행하세요.</p>
+
+            <div class="prompt-grid reveal" style="margin-top:34px;">
+                <div class="prompt" data-st="1">
+                    <div class="ptop"><span class="ptag">PROMPT 1 · API 찾기</span><button class="copybtn" data-copy="나는 구글시트에 [원하는 데이터]를 자동으로 가져오고 싶어. 사용할 수 있는 공개 API가 있는지 알려줘. 무료로 사용할 수 있는지, 인증키가 필요한지, 구글시트와 연동 가능한지도 알려줘.">복사</button></div>
+                    <div class="ptxt">나는 구글시트에 <span class="v">[원하는 데이터]</span>를 자동으로 가져오고 싶어. 사용할 수 있는 공개 API가 있는지, 무료인지, 인증키가 필요한지, 구글시트 연동이 되는지 알려줘.</div>
+                </div>
+                <div class="prompt" data-st="2">
+                    <div class="ptop"><span class="ptag">PROMPT 2 · 연결 방법</span><button class="copybtn" data-copy="이 API를 구글시트 Apps Script로 연결하고 싶어. 초보자도 이해할 수 있게 단계별로 설명해줘. 필요한 준비물, API 요청 URL, 예시 코드, 시트에 데이터를 넣는 방법까지 알려줘.">복사</button></div>
+                    <div class="ptxt">이 API를 Apps Script로 연결하고 싶어. <span class="v">초보자도 이해할 수 있게</span> 단계별로, 준비물·요청 URL·예시 코드·시트에 넣는 방법까지 알려줘.</div>
+                </div>
+                <div class="prompt" data-st="3">
+                    <div class="ptop"><span class="ptag">PROMPT 3 · 항목 고르기</span><button class="copybtn" data-copy="API 응답 데이터가 JSON 형태로 오는데, 이 중에서 구글시트에 넣기 좋은 항목만 골라줘. 컬럼명도 추천해줘.">복사</button></div>
+                    <div class="ptxt">응답이 <span class="v">JSON</span>으로 오는데, 이 중에서 구글시트에 넣기 좋은 항목만 골라줘. 컬럼명도 추천해줘.</div>
+                </div>
+                <div class="prompt" data-st="4">
+                    <div class="ptop"><span class="ptag">PROMPT 4 · 표 구조</span><button class="copybtn" data-copy="아래 API 응답 예시를 보고 구글시트 표로 정리하려면 어떤 컬럼 구조가 좋을지 추천해줘.">복사</button></div>
+                    <div class="ptxt">아래 API <span class="v">응답 예시</span>를 보고, 구글시트 표로 정리하려면 어떤 컬럼 구조가 좋을지 추천해줘.</div>
+                </div>
+            </div>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">08</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 9 — 좋은 질문의 구조
+         핵심: 질문에 포함하면 좋은 것 + 예시
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">좋은 질문의 구조</div>
+            <h2 class="title reveal">AI에게 질문할 때 <span style="color:var(--blue)">포함하면 좋은 것</span></h2>
+
+            <div class="grid g2 reveal" style="margin-top:40px; align-items:start;">
+                <div class="grid g2" data-st="1" style="gap:16px 36px;">
+                    <ul class="bullets" style="gap:16px;">
+                        <li>가져오고 싶은 데이터</li>
+                        <li>사용 목적</li>
+                        <li>구글시트에 넣고 싶은 이유</li>
+                        <li>무료 API 선호 여부</li>
+                    </ul>
+                    <ul class="bullets" style="gap:16px;">
+                        <li>인증키 사용 가능 여부</li>
+                        <li>원하는 컬럼 구조</li>
+                        <li>초보자 기준 설명 요청</li>
+                    </ul>
+                </div>
+                <div class="exbox" data-st="2">
+                    <span class="q">예시 질문</span><br>
+                    “나는 <b>지역 행사 데이터</b>를 구글시트에 정리하고 싶어. <b>행사명·날짜·장소·설명·링크</b>를 컬럼으로 만들고 싶고, <b>무료 API</b>를 우선으로 찾고 싶어. 사용할 수 있는 API와 연동 방법을 <b>초보자 기준</b>으로 알려줘.”
+                </div>
+            </div>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">09</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 10 — API 사용 시 주의사항
+         핵심: 꼭 확인할 것 + "API 키는 비밀번호처럼"
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">API 사용 시 주의사항</div>
+            <h2 class="title reveal" style="font-size:64px;">API를 쓸 때 꼭 확인할 것</h2>
+
+            <div class="grid g2 reveal" style="margin-top:34px; gap:16px 50px;">
+                <ul class="bullets" data-st="1" style="gap:16px; font-size:28px;">
+                    <li>모든 API가 무료는 아닙니다.</li>
+                    <li>인증키가 필요한 경우가 많습니다.</li>
+                    <li>하루 요청 횟수 제한이 있을 수 있습니다.</li>
+                    <li>문서의 사용 조건을 꼭 확인합니다.</li>
+                </ul>
+                <ul class="bullets" data-st="2" style="gap:16px; font-size:28px;">
+                    <li>개인정보·민감 데이터는 함부로 수집·저장 금지.</li>
+                    <li>응답이 복잡하면 필요한 항목만 골라냅니다.</li>
+                    <li>한 번에 너무 많이 가져오면 시트가 느려집니다.</li>
+                </ul>
+            </div>
+
+            <div class="bigbox reveal" style="margin-top:auto;">
+                <span class="ic">🔑</span>
+                <span class="txt">API 키는 <span class="key">비밀번호처럼</span> 다루기 — 공개 웹페이지나 공유 문서에 노출 금지</span>
+            </div>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">10</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 11 — API와 크롤링의 차이 (비교표)
+         핵심: 이번 주엔 크롤링이 아니라 API
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">API vs 크롤링</div>
+            <h2 class="title reveal" style="font-size:62px;">API가 없으면 크롤링을 생각할 수 있습니다</h2>
+
+            <div class="compare reveal" style="margin-top:34px;">
+                <div class="col api" data-st="1">
+                    <div class="head"><span class="ic">🔌</span>API</div>
+                    <ul>
+                        <li>공식적으로 제공되는 데이터 통로</li>
+                        <li>구조가 비교적 안정적</li>
+                        <li>자동화에 적합</li>
+                        <li>인증키·사용량 제한이 있을 수 있음</li>
+                    </ul>
+                </div>
+                <div class="col crawl" data-st="2">
+                    <div class="head"><span class="ic">🕸️</span>크롤링 / 자동화</div>
+                    <ul>
+                        <li>웹페이지에 보이는 정보를 자동 수집</li>
+                        <li>API가 없을 때 대안으로 사용</li>
+                        <li>사이트 구조 변경에 취약</li>
+                        <li>약관·저작권·개인정보 이슈 확인 필요</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="callout coral reveal" style="margin-top:34px;">“이번 주에는 크롤링이 아니라 <b>API 사용</b>을 실습합니다.”</div>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">11</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 12 — 실습 주제 예시
+         핵심: 어떤 데이터를 가져올 수 있을까
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">실습 주제 예시</div>
+            <h2 class="title reveal">어떤 데이터를 가져올 수 있을까요?</h2>
+
+            <div class="grid g3 reveal" style="margin-top:40px; gap:22px;">
+                <div class="card" data-st="1" style="padding:30px 32px; flex-direction:row; align-items:center; gap:20px;"><span class="ic">🌤️</span><h3 style="font-size:30px;">날씨 데이터</h3></div>
+                <div class="card c-coral" data-st="1" style="padding:30px 32px; flex-direction:row; align-items:center; gap:20px;"><span class="ic">📰</span><h3 style="font-size:30px;">뉴스 데이터</h3></div>
+                <div class="card c-amber" data-st="1" style="padding:30px 32px; flex-direction:row; align-items:center; gap:20px;"><span class="ic">📚</span><h3 style="font-size:30px;">도서 검색</h3></div>
+                <div class="card c-mint" data-st="2" style="padding:30px 32px; flex-direction:row; align-items:center; gap:20px;"><span class="ic">🎬</span><h3 style="font-size:30px;">영화 정보</h3></div>
+                <div class="card" data-st="2" style="padding:30px 32px; flex-direction:row; align-items:center; gap:20px;"><span class="ic">🏛️</span><h3 style="font-size:30px;">공공데이터</h3></div>
+                <div class="card c-coral" data-st="2" style="padding:30px 32px; flex-direction:row; align-items:center; gap:20px;"><span class="ic">💱</span><h3 style="font-size:30px;">환율 데이터</h3></div>
+                <div class="card c-amber" data-st="3" style="padding:30px 32px; flex-direction:row; align-items:center; gap:20px;"><span class="ic">🎪</span><h3 style="font-size:30px;">지역 행사</h3></div>
+                <div class="card c-mint" data-st="3" style="padding:30px 32px; flex-direction:row; align-items:center; gap:20px;"><span class="ic">▶️</span><h3 style="font-size:30px;">유튜브 채널</h3></div>
+                <div class="card" data-st="3" style="padding:30px 32px; flex-direction:row; align-items:center; gap:20px;"><span class="ic">🗺️</span><h3 style="font-size:30px;">관광지 정보</h3></div>
+            </div>
+
+            <p class="lead reveal" style="margin-top:auto; font-size:27px;">👉 관심 있는 데이터를 고르고, 사용할 수 있는 API가 있는지 AI에게 물어보세요.</p>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">12</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 13 — 2주차 과제 안내
+         핵심: API 데이터를 구글시트에 연결하기 (7단계)
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">2주차 과제</div>
+            <h2 class="title reveal" style="font-size:60px;">API 데이터를 구글시트에 연결하기</h2>
+
+            <div class="steps reveal" style="margin-top:38px; grid-template-columns:1fr 1fr; gap:22px 60px;">
+                <div class="step" data-st="1"><div class="sn">1</div><div class="sc"><div class="st" style="font-size:28px;">가져올 데이터 주제를 정한다</div></div></div>
+                <div class="step" data-st="2"><div class="sn">2</div><div class="sc"><div class="st" style="font-size:28px;">GPT·Gemini에게 사용 가능한 API를 묻는다</div></div></div>
+                <div class="step" data-st="3"><div class="sn">3</div><div class="sc"><div class="st" style="font-size:28px;">무료·인증키·시트연동 여부를 확인한다</div></div></div>
+                <div class="step" data-st="4"><div class="sn">4</div><div class="sc"><div class="st" style="font-size:28px;">API 응답 예시를 확인한다</div></div></div>
+                <div class="step" data-st="5"><div class="sn">5</div><div class="sc"><div class="st" style="font-size:28px;">구글시트에 넣을 컬럼을 정한다</div></div></div>
+                <div class="step" data-st="6"><div class="sn">6</div><div class="sc"><div class="st" style="font-size:28px;">Apps Script 등으로 데이터를 가져온다</div></div></div>
+                <div class="step" data-st="7" style="grid-column:1 / -1;"><div class="sn">7</div><div class="sc"><div class="st" style="font-size:28px;">가져온 데이터를 보기 좋게 정제한다</div></div></div>
+            </div>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">13</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 14 — 제출물
+         핵심: 과제 제출 시 포함할 것 (체크리스트)
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">제출물</div>
+            <h2 class="title reveal">과제 제출 시 포함할 것</h2>
+
+            <div class="checks reveal" style="margin-top:auto; margin-bottom:auto;">
+                <div class="check" data-st="1"><span class="box">✓</span>데이터가 들어간 구글시트 링크</div>
+                <div class="check" data-st="1"><span class="box">✓</span>사용한 API 이름</div>
+                <div class="check" data-st="2"><span class="box">✓</span>가져온 데이터 항목 설명</div>
+                <div class="check" data-st="2"><span class="box">✓</span>AI에게 물어본 프롬프트</div>
+                <div class="check" data-st="3"><span class="box">✓</span>최종 구글시트 컬럼 구조</div>
+                <div class="check" data-st="3"><span class="box">✓</span>어려웠던 점 또는 알게 된 점</div>
+            </div>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">14</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 15 — 과제 예시
+         핵심: 3가지 예시
+         ======================================================== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="kicker reveal">과제 예시</div>
+            <h2 class="title reveal">이렇게 하면 됩니다</h2>
+
+            <div class="grid g3 reveal" style="margin-top:auto; margin-bottom:auto;">
+                <div class="card" data-st="1">
+                    <div class="ic">🌤️</div>
+                    <h3>예시 1 · 날씨</h3>
+                    <p>서울 날씨 데이터를 가져와 <b>날짜 · 기온 · 날씨 상태 · 습도</b>를 구글시트에 정리</p>
+                </div>
+                <div class="card c-coral" data-st="2">
+                    <div class="ic">📚</div>
+                    <h3>예시 2 · 도서</h3>
+                    <p>도서 검색 API로 <b>책 제목 · 저자 · 출판사 · 출간일 · 링크</b>를 구글시트에 정리</p>
+                </div>
+                <div class="card c-amber" data-st="3">
+                    <div class="ic">🎪</div>
+                    <h3>예시 3 · 행사</h3>
+                    <p>공공데이터 API로 <b>지역 행사명 · 날짜 · 장소 · 설명</b>을 구글시트에 정리</p>
+                </div>
+            </div>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">15</span></div>
+    </section>
+
+    <!-- ========================================================
+         SLIDE 16 — 마무리
+         핵심: 좋은 AI 활용은 좋은 데이터 정리에서 시작된다
+         ======================================================== -->
+    <section class="slide closing">
+        <div class="pad">
+            <div class="kicker reveal">마무리</div>
+            <h2 class="title reveal" style="font-size:66px;">데이터 연동은 AI 활용의 <span style="color:var(--amber)">시작점</span></h2>
+
+            <p class="lead reveal" style="margin-top:30px; max-width:1350px;">
+                지난주에는 이미 정리된 데이터를 웹에 출력했고,<br>
+                이번 주에는 외부 데이터를 가져와 구글시트에 연결합니다.<br>
+                중요한 것은 <b style="color:#fff">많이</b> 가져오는 것이 아니라, <b style="color:#fff">활용할 수 있는 형태로 정리</b>하는 것입니다.
+            </p>
+
+            <div class="finalq reveal" style="margin-top:auto;">“좋은 AI 활용은 <span class="y">좋은 데이터 정리</span>에서 시작된다.”</div>
+        </div>
+        <div class="foot"><span class="brand">AI 스터디 2주차</span><span class="pg">16</span></div>
+    </section>
+
+</main>
+</div>
+
+<!-- 좌우 이동 안내 (무대 바깥 chrome) -->
+<div class="deck-controls" style="font-family:var(--font); font-size:16px; font-weight:600; color:#90a0b3; background:rgba(255,255,255,.7); padding:8px 18px; border-radius:999px; backdrop-filter:blur(4px);">
+    ← → 또는 Space 로 이동
+</div>
+
+<script>
+/* ============================================================
+   슬라이드 프레젠테이션 컨트롤러
+   - 키보드(←→, Space, PageUp/Down, Home/End), 휠, 터치 스와이프
+   - 고정 16:9 무대 스케일링
+   - 진행 막대
+   ============================================================ */
+class SlidePresentation {
+    constructor() {
+        this.slides = Array.from(document.querySelectorAll('.slide'));
+        this.stage = document.getElementById('deckStage');
+        this.progress = document.getElementById('progress');
+        this.current = 0;
+        this.setupScale();
+        this.setupKeyboard();
+        this.setupWheel();
+        this.setupTouch();
+        this.show(0);
+    }
+    /* 무대 전체를 뷰포트에 맞춰 균일 스케일 (레터박스) */
+    setupScale() {
+        const scale = () => {
+            const f = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+            const x = (window.innerWidth - 1920 * f) / 2;
+            const y = (window.innerHeight - 1080 * f) / 2;
+            this.stage.style.transform = `translate(${x}px, ${y}px) scale(${f})`;
+        };
+        scale();
+        window.addEventListener('resize', scale);
+    }
+    show(i) {
+        this.current = Math.max(0, Math.min(i, this.slides.length - 1));
+        this.slides.forEach((s, idx) => {
+            s.classList.toggle('active', idx === this.current);
+            s.classList.toggle('visible', idx === this.current);
+        });
+        this.progress.style.width = ((this.current) / (this.slides.length - 1) * 100) + '%';
+    }
+    next() { this.show(this.current + 1); }
+    prev() { this.show(this.current - 1); }
+    setupKeyboard() {
+        document.addEventListener('keydown', (e) => {
+            // 편집 중에는 네비게이션 비활성화
+            if (document.body.classList.contains('editing') && e.target.isContentEditable) return;
+            switch (e.key) {
+                case 'ArrowRight': case ' ': case 'PageDown': e.preventDefault(); this.next(); break;
+                case 'ArrowLeft': case 'PageUp': e.preventDefault(); this.prev(); break;
+                case 'Home': e.preventDefault(); this.show(0); break;
+                case 'End': e.preventDefault(); this.show(this.slides.length - 1); break;
+            }
+        });
+    }
+    setupWheel() {
+        let lock = false;
+        window.addEventListener('wheel', (e) => {
+            if (lock || Math.abs(e.deltaY) < 24) return;
+            lock = true;
+            if (e.deltaY > 0) this.next(); else this.prev();
+            setTimeout(() => lock = false, 600);
+        }, { passive: true });
+    }
+    setupTouch() {
+        let x0 = null;
+        window.addEventListener('touchstart', (e) => x0 = e.touches[0].clientX, { passive: true });
+        window.addEventListener('touchend', (e) => {
+            if (x0 === null) return;
+            const dx = e.changedTouches[0].clientX - x0;
+            if (Math.abs(dx) > 50) { dx < 0 ? this.next() : this.prev(); }
+            x0 = null;
+        }, { passive: true });
+    }
+}
+const deck = new SlidePresentation();
+
+/* ============================================================
+   프롬프트 복사 버튼
+   ============================================================ */
+document.querySelectorAll('.copybtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const text = btn.getAttribute('data-copy');
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch (_) {
+            // 클립보드 API 실패 시 폴백
+            const ta = document.createElement('textarea');
+            ta.value = text; document.body.appendChild(ta); ta.select();
+            document.execCommand('copy'); document.body.removeChild(ta);
+        }
+        const old = btn.textContent;
+        btn.textContent = '복사됨 ✓'; btn.classList.add('done');
+        setTimeout(() => { btn.textContent = old; btn.classList.remove('done'); }, 1400);
+    });
+});
+
+/* ============================================================
+   인라인 편집 (post-draft)
+   좌상단 호버 또는 E 키 → 편집 모드, Ctrl+S 로 HTML 저장
+   ============================================================ */
+const editor = {
+    isActive: false,
+    toggle() {
+        this.isActive = !this.isActive;
+        document.body.classList.toggle('editing', this.isActive);
+        document.getElementById('editToggle').classList.toggle('active', this.isActive);
+        document.getElementById('editHint').classList.toggle('show', this.isActive);
+        const editables = document.querySelectorAll('h1,h2,h3,p,li,.st,.ptxt,.coremsg,.callout,.finalq,.exbox,.lab,.chip,.check');
+        editables.forEach(el => el.contentEditable = this.isActive ? 'true' : 'false');
+    }
+};
+const editToggle = document.getElementById('editToggle');
+const hotzone = document.querySelector('.edit-hotzone');
+let hideTimeout = null;
+editToggle.addEventListener('click', () => editor.toggle());
+hotzone.addEventListener('click', () => editor.toggle());
+hotzone.addEventListener('mouseenter', () => { clearTimeout(hideTimeout); editToggle.classList.add('show'); });
+hotzone.addEventListener('mouseleave', () => { hideTimeout = setTimeout(() => { if (!editor.isActive) editToggle.classList.remove('show'); }, 400); });
+editToggle.addEventListener('mouseenter', () => clearTimeout(hideTimeout));
+editToggle.addEventListener('mouseleave', () => { hideTimeout = setTimeout(() => { if (!editor.isActive) editToggle.classList.remove('show'); }, 400); });
+document.addEventListener('keydown', (e) => {
+    if ((e.key === 'e' || e.key === 'E') && !e.target.isContentEditable) editor.toggle();
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const blob = new Blob([html], { type: 'text/html' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'ai-study-week2.html';
+        a.click();
+    }
+});
+</script>
+</body>
+</html>
