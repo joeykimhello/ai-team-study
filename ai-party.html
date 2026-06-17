@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Party — 스터디 회고 & 결과물 발표</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Black+Han+Sans&family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+/* ===========================================
+   CSS DESIGN TOKENS — FESTA SYSTEM
+   Warm off-white canvas · geometric celebration
+   =========================================== */
+:root {
+  --bg:        #FEFDF8;
+  --ink:       #18181B;
+  --coral:     #FF5E5B;
+  --teal:      #00C9A7;
+  --yellow:    #FFD93D;
+  --lavender:  #B8A9FF;
+  --green:     #6EE7B7;
+  --mid-gray:  #6B7280;
+  --light-gray:#E5E7EB;
+  --ink-10:    rgba(24,24,27,0.10);
+  --ink-06:    rgba(24,24,27,0.06);
+  --ink-03:    rgba(24,24,27,0.03);
+
+  --font-en:   'Bebas Neue', cursive;
+  --font-ko:   'Black Han Sans', 'Noto Sans KR', sans-serif;
+  --font-body: 'Noto Sans KR', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+
+  --ease-expo:   cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur:         0.5s;
+}
+
+/* ===========================================
+   VIEWPORT BASE — Fixed 16:9 Stage
+   =========================================== */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  width:100%; height:100%;
+  overflow:hidden;
+  background:#111;
+  --stage-bg: #111;
+}
+
+.deck-viewport {
+  position:fixed; inset:0;
+  overflow:hidden;
+  background:#111;
+}
+
+.deck-stage {
+  position:absolute; left:0; top:0;
+  width:1920px; height:1080px;
+  overflow:hidden;
+  transform-origin:0 0;
+  background:var(--bg);
+}
+
+.slide {
+  position:absolute; inset:0;
+  width:1920px; height:1080px;
+  overflow:hidden; display:block;
+  visibility:hidden; opacity:0;
+  pointer-events:none;
+  background:var(--bg);
+  transition: opacity 0.3s ease;
+}
+
+.slide.active {
+  visibility:visible; opacity:1;
+  pointer-events:auto; z-index:1;
+}
+
+img, video, canvas, svg { max-width:100%; max-height:100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration:0.01ms !important;
+    transition-duration:0.2s !important;
+  }
+}
+
+/* ===========================================
+   SHARED COMPONENTS — Festa Design System
+   =========================================== */
+
+/* Ghost background text — large faint lettering */
+.ghost {
+  position:absolute;
+  font-family:var(--font-en);
+  font-size:420px;
+  color:var(--ink-03);
+  line-height:1;
+  white-space:nowrap;
+  pointer-events:none;
+  z-index:0;
+  letter-spacing:6px;
+  user-select:none;
+}
+
+/* Eyebrow label — mono tag above headings */
+.eyebrow {
+  display:inline-flex; align-items:center; gap:16px;
+  font-family:var(--font-mono);
+  font-size:22px; font-weight:400;
+  color:var(--mid-gray);
+  letter-spacing:3px;
+  text-transform:uppercase;
+}
+.eyebrow-line {
+  display:inline-block;
+  width:48px; height:3px;
+  background:currentColor;
+  flex-shrink:0;
+}
+
+/* Numbered badge pill */
+.badge {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:52px; height:52px;
+  border-radius:50%;
+  background:var(--ink);
+  color:white;
+  font-family:var(--font-mono); font-size:22px; font-weight:500;
+  flex-shrink:0;
+}
+
+/* Section heading — Korean bold display */
+.slide-heading {
+  font-family:var(--font-ko);
+  font-size:80px;
+  color:var(--ink);
+  line-height:1.15;
+  letter-spacing:0;
+}
+
+/* Highlight span — colored underline accent */
+.hl-coral  { color:var(--coral); }
+.hl-teal   { color:var(--teal); }
+.hl-yellow { color:var(--yellow); }
+.hl-lav    { color:var(--lavender); }
+
+/* Tag chip */
+.chip {
+  display:inline-flex; align-items:center; gap:10px;
+  padding:10px 22px;
+  border:2px solid var(--ink-10);
+  border-radius:6px;
+  font-family:var(--font-mono); font-size:18px;
+  color:var(--ink);
+  opacity:0.7;
+  letter-spacing:1px;
+}
+.chip-dot {
+  width:10px; height:10px;
+  border-radius:50%; flex-shrink:0;
+}
+
+/* ===========================================
+   REVEAL ANIMATIONS — triggered by .visible
+   =========================================== */
+.reveal {
+  opacity:0;
+  transform:translateY(28px);
+  transition:opacity var(--dur) var(--ease-expo),
+              transform var(--dur) var(--ease-expo);
+}
+.reveal-left {
+  opacity:0;
+  transform:translateX(-36px);
+  transition:opacity var(--dur) var(--ease-expo),
+              transform var(--dur) var(--ease-expo);
+}
+.reveal-scale {
+  opacity:0;
+  transform:scale(0.85);
+  transition:opacity var(--dur) var(--ease-expo),
+              transform var(--dur) var(--ease-expo);
+}
+
+.slide.visible .reveal,
+.slide.visible .reveal-left,
+.slide.visible .reveal-scale { opacity:1; transform:none; }
+
+/* Stagger delays */
+.d0 { transition-delay:0.00s; }
+.d1 { transition-delay:0.08s; }
+.d2 { transition-delay:0.16s; }
+.d3 { transition-delay:0.24s; }
+.d4 { transition-delay:0.32s; }
+.d5 { transition-delay:0.40s; }
+.d6 { transition-delay:0.48s; }
+.d7 { transition-delay:0.56s; }
+
+
+/* ===========================================
+   SLIDE 1 — TITLE: AI Party
+   =========================================== */
+#s1 { background:var(--bg); }
+
+#s1 .ghost {
+  top:50%; left:50%;
+  transform:translate(-50%, -50%);
+  font-size:440px;
+  letter-spacing:12px;
+}
+
+/* Right geometric burst */
+#s1 .geo-wrap {
+  position:absolute; right:0; top:0;
+  width:660px; height:1080px;
+  pointer-events:none; z-index:1;
+}
+#s1 .geo-semi {
+  position:absolute;
+  width:580px; height:580px;
+  border-radius:50%;
+  background:var(--coral);
+  top:50%; right:-140px;
+  transform:translateY(-50%);
+}
+#s1 .geo-c1 {
+  position:absolute;
+  width:170px; height:170px;
+  border-radius:50%; background:var(--yellow);
+  top:88px; right:400px;
+}
+#s1 .geo-c2 {
+  position:absolute;
+  width:90px; height:90px;
+  border-radius:50%; background:var(--teal);
+  bottom:130px; right:370px;
+}
+#s1 .geo-c3 {
+  position:absolute;
+  width:54px; height:54px;
+  border-radius:50%; background:var(--lavender);
+  top:310px; right:490px;
+}
+#s1 .geo-sq {
+  position:absolute;
+  width:80px; height:80px;
+  background:var(--ink);
+  top:190px; right:550px;
+  transform:rotate(22deg);
+}
+#s1 .geo-ring {
+  position:absolute;
+  width:220px; height:220px;
+  border-radius:50%;
+  border:22px solid var(--ink-10);
+  bottom:210px; right:450px;
+}
+
+/* Left content */
+#s1 .content {
+  position:absolute;
+  left:120px; top:0;
+  width:1060px; height:1080px;
+  display:flex; flex-direction:column;
+  justify-content:center;
+  z-index:2;
+}
+#s1 .eyebrow { margin-bottom:36px; }
+#s1 .eyebrow .eyebrow-line { background:var(--coral); }
+#s1 .title-row {
+  display:flex; align-items:flex-end; gap:20px;
+  line-height:1;
+  margin-bottom:6px;
+}
+#s1 .t-ai {
+  font-family:var(--font-en);
+  font-size:230px;
+  color:var(--ink);
+  line-height:1;
+}
+#s1 .t-party {
+  font-family:var(--font-ko);
+  font-size:210px;
+  color:var(--coral);
+  letter-spacing:-2px;
+  line-height:1;
+}
+#s1 .subtitle {
+  font-family:var(--font-body);
+  font-size:34px; font-weight:400;
+  color:var(--mid-gray);
+  letter-spacing:0; line-height:1.6;
+  margin:28px 0 56px;
+}
+#s1 .chip-row { display:flex; gap:16px; flex-wrap:nowrap; }
+
+
+/* ===========================================
+   SLIDE 2 — JOURNEY: 스터디 여정
+   =========================================== */
+#s2 { background:var(--bg); }
+#s2 .ghost {
+  font-size:520px;
+  bottom:-60px; right:-20px;
+  letter-spacing:0; color:var(--ink-03);
+}
+#s2 .content {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column;
+  padding:88px 120px 80px;
+  z-index:2;
+}
+#s2 .top { margin-bottom:72px; }
+#s2 .top .eyebrow .eyebrow-line { background:var(--mid-gray); }
+#s2 .top .slide-heading { margin-top:16px; font-size:72px; }
+
+/* Timeline */
+#s2 .timeline {
+  display:flex; align-items:flex-start;
+  gap:0; flex:1;
+}
+#s2 .t-node {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; position:relative;
+}
+/* Connector line between nodes */
+#s2 .t-node:not(:last-child)::after {
+  content:'';
+  position:absolute;
+  top:36px; left:calc(50% + 36px);
+  width:calc(100% - 72px);
+  height:4px;
+  background:var(--light-gray);
+  z-index:0;
+}
+#s2 .t-circle {
+  width:72px; height:72px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-size:28px; font-weight:500;
+  color:white;
+  position:relative; z-index:1;
+  margin-bottom:28px;
+  flex-shrink:0;
+}
+#s2 .t-node:nth-child(1) .t-circle { background:var(--coral); }
+#s2 .t-node:nth-child(2) .t-circle { background:var(--teal); }
+#s2 .t-node:nth-child(3) .t-circle { background:var(--yellow); color:var(--ink); }
+#s2 .t-node:nth-child(4) .t-circle { background:var(--lavender); color:var(--ink); }
+#s2 .t-node:nth-child(5) .t-circle { background:var(--green); color:var(--ink); }
+
+#s2 .t-title {
+  font-family:var(--font-ko); font-size:34px;
+  color:var(--ink); letter-spacing:0;
+  text-align:center; margin-bottom:14px;
+}
+#s2 .t-desc {
+  font-family:var(--font-body); font-size:24px; font-weight:400;
+  color:var(--mid-gray); letter-spacing:0;
+  text-align:center; line-height:1.6;
+}
+
+
+/* ===========================================
+   SLIDE 3 — PROMPT QUALITY
+   =========================================== */
+#s3 { background:var(--bg); }
+#s3 .ghost {
+  font-size:360px; bottom:-30px; left:-10px;
+  letter-spacing:4px;
+}
+#s3 .top {
+  position:absolute; top:72px; left:120px; right:120px;
+  z-index:2;
+}
+#s3 .top .eyebrow .eyebrow-line { background:var(--coral); }
+#s3 .top .slide-heading { margin-top:14px; font-size:68px; }
+#s3 .top .tag {
+  display:inline-block; margin-top:8px;
+  padding:8px 18px;
+  background:var(--coral); color:white;
+  font-family:var(--font-mono); font-size:18px;
+  border-radius:4px;
+}
+
+/* Two-panel comparison */
+#s3 .compare {
+  position:absolute;
+  bottom:80px; left:120px; right:120px;
+  height:520px;
+  display:flex; gap:40px;
+  z-index:2;
+}
+#s3 .panel {
+  flex:1; border-radius:16px;
+  padding:52px 56px;
+  display:flex; flex-direction:column; gap:28px;
+}
+#s3 .panel-bad {
+  background:rgba(255,94,91,0.08);
+  border:2px solid rgba(255,94,91,0.25);
+}
+#s3 .panel-good {
+  background:rgba(0,201,167,0.08);
+  border:2px solid rgba(0,201,167,0.25);
+}
+#s3 .p-label {
+  display:inline-flex; align-items:center; gap:12px;
+  font-family:var(--font-mono); font-size:22px; font-weight:500;
+  letter-spacing:2px;
+}
+#s3 .p-label-bad  { color:var(--coral); }
+#s3 .p-label-good { color:var(--teal); }
+#s3 .p-icon {
+  width:36px; height:36px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; font-weight:700;
+  flex-shrink:0;
+}
+#s3 .p-icon-bad  { background:var(--coral); color:white; }
+#s3 .p-icon-good { background:var(--teal);  color:white; }
+
+#s3 .p-prompt {
+  font-family:var(--font-body); font-size:30px; font-weight:500;
+  color:var(--ink); letter-spacing:0; line-height:1.5;
+  padding:20px 24px;
+  border-radius:10px;
+  font-style:italic;
+}
+#s3 .panel-bad  .p-prompt { background:rgba(255,94,91,0.1); }
+#s3 .panel-good .p-prompt { background:rgba(0,201,167,0.1); }
+
+#s3 .p-result {
+  font-family:var(--font-body); font-size:26px; font-weight:400;
+  color:var(--mid-gray); letter-spacing:0; line-height:1.55;
+}
+
+
+/* ===========================================
+   SLIDE 4 — OUTPUT FORMATS
+   =========================================== */
+#s4 { background:var(--bg); }
+#s4 .ghost {
+  font-size:340px; top:50%; left:50%;
+  transform:translate(-50%, -50%);
+}
+#s4 .top {
+  position:absolute; top:72px; left:120px; right:120px;
+  z-index:2;
+}
+#s4 .top .eyebrow .eyebrow-line { background:var(--teal); }
+#s4 .top .slide-heading { margin-top:14px; font-size:68px; }
+
+/* 4 format cards */
+#s4 .cards {
+  position:absolute;
+  bottom:80px; left:120px; right:120px;
+  height:520px;
+  display:flex; gap:36px;
+  z-index:2;
+}
+#s4 .card {
+  flex:1; border-radius:16px;
+  border:2px solid var(--ink-10);
+  padding:48px 44px;
+  display:flex; flex-direction:column; gap:24px;
+  background:white;
+}
+#s4 .card-icon {
+  width:64px; height:64px;
+  border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:32px;
+}
+#s4 .card:nth-child(1) .card-icon { background:rgba(255,94,91,0.12);  }
+#s4 .card:nth-child(2) .card-icon { background:rgba(0,201,167,0.12);  }
+#s4 .card:nth-child(3) .card-icon { background:rgba(255,217,61,0.15); }
+#s4 .card:nth-child(4) .card-icon { background:rgba(184,169,255,0.15); }
+
+#s4 .card-name {
+  font-family:var(--font-ko); font-size:44px;
+  color:var(--ink); letter-spacing:0;
+}
+#s4 .card-when {
+  font-family:var(--font-body); font-size:26px; font-weight:400;
+  color:var(--mid-gray); letter-spacing:0; line-height:1.5;
+  flex:1;
+}
+#s4 .card-tag {
+  display:inline-flex;
+  padding:8px 16px;
+  border-radius:999px; font-size:20px;
+  font-family:var(--font-mono);
+  width:fit-content;
+  letter-spacing:1px;
+}
+#s4 .card:nth-child(1) .card-tag { background:rgba(255,94,91,0.1);   color:var(--coral);    }
+#s4 .card:nth-child(2) .card-tag { background:rgba(0,201,167,0.1);   color:var(--teal);     }
+#s4 .card:nth-child(3) .card-tag { background:rgba(255,217,61,0.15); color:#A16207;         }
+#s4 .card:nth-child(4) .card-tag { background:rgba(184,169,255,0.15);color:#6D28D9;         }
+
+
+/* ===========================================
+   SLIDE 5 — DEPLOY
+   =========================================== */
+#s5 { background:var(--bg); }
+#s5 .ghost {
+  font-size:380px; bottom:-20px; right:-10px;
+}
+#s5 .top {
+  position:absolute; top:72px; left:120px; right:120px;
+  z-index:2;
+}
+#s5 .top .eyebrow .eyebrow-line { background:var(--yellow); }
+#s5 .top .slide-heading { margin-top:14px; font-size:68px; }
+
+/* Flow diagram */
+#s5 .flow {
+  position:absolute;
+  top:50%; left:50%; transform:translate(-50%, -40%);
+  display:flex; align-items:center; gap:0;
+  z-index:2;
+}
+#s5 .flow-box {
+  width:380px; padding:44px 40px;
+  border-radius:16px;
+  border:2px solid var(--ink-10);
+  background:white;
+  display:flex; flex-direction:column; gap:16px;
+  align-items:center; text-align:center;
+}
+#s5 .fb-num {
+  width:48px; height:48px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-size:22px; font-weight:500;
+  color:white;
+  flex-shrink:0;
+}
+#s5 .flow-box:nth-child(1) .fb-num { background:var(--yellow); color:var(--ink); }
+#s5 .flow-box:nth-child(3) .fb-num { background:var(--coral); }
+#s5 .flow-box:nth-child(5) .fb-num { background:var(--teal); }
+
+#s5 .fb-title {
+  font-family:var(--font-ko); font-size:44px;
+  color:var(--ink); letter-spacing:0;
+}
+#s5 .fb-desc {
+  font-family:var(--font-body); font-size:24px; font-weight:400;
+  color:var(--mid-gray); letter-spacing:0; line-height:1.5;
+}
+#s5 .flow-arrow {
+  width:80px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+#s5 .flow-arrow svg { width:56px; height:56px; }
+
+#s5 .insight {
+  position:absolute; bottom:80px; left:120px; right:120px;
+  text-align:center; z-index:2;
+  font-family:var(--font-body); font-size:28px; font-weight:400;
+  color:var(--mid-gray); letter-spacing:0;
+}
+#s5 .insight strong {
+  color:var(--ink); font-weight:700;
+}
+
+
+/* ===========================================
+   SLIDE 6 — APPS SCRIPT
+   =========================================== */
+#s6 { background:var(--bg); }
+#s6 .ghost {
+  font-size:360px; bottom:-20px; left:-10px;
+}
+#s6 .top {
+  position:absolute; top:72px; left:120px; right:120px;
+  z-index:2;
+}
+#s6 .top .eyebrow .eyebrow-line { background:var(--teal); }
+#s6 .top .slide-heading { margin-top:14px; font-size:60px; }
+#s6 .top .subtitle {
+  font-family:var(--font-body); font-size:28px; font-weight:400;
+  color:var(--mid-gray); margin-top:8px; letter-spacing:0;
+}
+
+/* Three-column structure */
+#s6 .pillars {
+  position:absolute;
+  bottom:80px; left:120px; right:120px;
+  height:510px;
+  display:flex; gap:48px;
+  z-index:2;
+}
+#s6 .pillar {
+  flex:1; border-radius:16px;
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+#s6 .pillar-head {
+  padding:40px 44px 32px;
+  display:flex; flex-direction:column; gap:16px;
+}
+#s6 .pillar:nth-child(1) .pillar-head { background:rgba(255,94,91,0.08); }
+#s6 .pillar:nth-child(2) .pillar-head { background:rgba(0,201,167,0.08); }
+#s6 .pillar:nth-child(3) .pillar-head { background:rgba(255,217,61,0.10); }
+
+#s6 .pillar-arrow {
+  display:flex; align-items:center; justify-content:center;
+  padding:16px;
+  font-size:32px; color:var(--mid-gray);
+}
+#s6 .pillar-label {
+  font-family:var(--font-mono); font-size:20px;
+  letter-spacing:2px; color:var(--mid-gray);
+}
+#s6 .pillar-title {
+  font-family:var(--font-ko); font-size:48px;
+  color:var(--ink); letter-spacing:0;
+}
+#s6 .pillar-body {
+  flex:1; padding:28px 44px 36px;
+  background:white;
+  border:2px solid var(--ink-10);
+  border-radius:0 0 16px 16px;
+}
+#s6 .pillar-body ul {
+  list-style:none;
+  display:flex; flex-direction:column; gap:14px;
+}
+#s6 .pillar-body li {
+  font-family:var(--font-body); font-size:26px; font-weight:400;
+  color:var(--ink); letter-spacing:0; line-height:1.45;
+  padding-left:24px; position:relative;
+}
+#s6 .pillar-body li::before {
+  content:'›';
+  position:absolute; left:0;
+  color:var(--mid-gray); font-size:24px;
+}
+
+
+/* ===========================================
+   SLIDE 7 — API INTEGRATION
+   =========================================== */
+#s7 { background:var(--bg); }
+#s7 .ghost {
+  font-size:480px; top:50%; right:-60px;
+  transform:translateY(-50%);
+}
+#s7 .top {
+  position:absolute; top:72px; left:120px; right:120px;
+  z-index:2;
+}
+#s7 .top .eyebrow .eyebrow-line { background:var(--lavender); }
+#s7 .top .slide-heading { margin-top:14px; font-size:68px; }
+
+/* 4-step horizontal flow */
+#s7 .flow {
+  position:absolute;
+  bottom:100px; left:80px; right:80px;
+  display:flex; align-items:center;
+  z-index:2;
+}
+#s7 .step {
+  flex:1; padding:44px 36px;
+  border-radius:16px; border:2px solid var(--ink-10);
+  background:white;
+  display:flex; flex-direction:column; gap:14px;
+  align-items:center; text-align:center;
+  min-height:340px; justify-content:center;
+}
+#s7 .step-num {
+  width:44px; height:44px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-size:20px;
+  color:white; flex-shrink:0;
+}
+#s7 .step:nth-child(1) .step-num { background:var(--lavender); color:var(--ink); }
+#s7 .step:nth-child(3) .step-num { background:var(--teal); }
+#s7 .step:nth-child(5) .step-num { background:var(--coral); }
+#s7 .step:nth-child(7) .step-num { background:var(--yellow); color:var(--ink); }
+
+#s7 .step-title {
+  font-family:var(--font-ko); font-size:40px;
+  color:var(--ink); letter-spacing:0;
+}
+#s7 .step-desc {
+  font-family:var(--font-body); font-size:23px; font-weight:400;
+  color:var(--mid-gray); letter-spacing:0; line-height:1.5;
+}
+#s7 .step-arrow {
+  width:60px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+
+
+/* ===========================================
+   SLIDE 8 — PRESENTATION GUIDE
+   =========================================== */
+#s8 { background:var(--bg); }
+#s8 .ghost {
+  font-size:340px; bottom:-20px; left:-10px;
+}
+#s8 .top {
+  position:absolute; top:72px; left:120px; right:120px;
+  z-index:2;
+}
+#s8 .top .eyebrow .eyebrow-line { background:var(--coral); }
+#s8 .top .slide-heading { margin-top:14px; font-size:72px; }
+
+/* Guide items */
+#s8 .guide-list {
+  position:absolute;
+  bottom:72px; left:120px; right:120px;
+  display:flex; gap:28px;
+  z-index:2;
+}
+#s8 .guide-item {
+  flex:1; padding:40px 36px;
+  border-radius:16px;
+  border:2px solid var(--ink-10);
+  background:white;
+  display:flex; flex-direction:column; gap:14px;
+}
+#s8 .gi-num {
+  width:44px; height:44px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-size:18px;
+  color:white; flex-shrink:0;
+}
+#s8 .guide-item:nth-child(1) .gi-num { background:var(--coral); }
+#s8 .guide-item:nth-child(2) .gi-num { background:var(--teal); }
+#s8 .guide-item:nth-child(3) .gi-num { background:var(--yellow); color:var(--ink); }
+#s8 .guide-item:nth-child(4) .gi-num { background:var(--lavender); color:var(--ink); }
+#s8 .guide-item:nth-child(5) .gi-num { background:var(--ink); }
+
+#s8 .gi-title {
+  font-family:var(--font-ko); font-size:36px;
+  color:var(--ink); letter-spacing:0;
+}
+#s8 .gi-desc {
+  font-family:var(--font-body); font-size:22px; font-weight:400;
+  color:var(--mid-gray); letter-spacing:0; line-height:1.5;
+  flex:1;
+}
+
+
+/* ===========================================
+   SLIDE 9 — PRESENTATION TEMPLATE
+   =========================================== */
+#s9 { background:var(--bg); }
+#s9 .ghost {
+  font-size:380px; top:50%; left:50%;
+  transform:translate(-50%, -50%);
+  white-space:nowrap;
+}
+#s9 .content {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column;
+  padding:80px 160px;
+  z-index:2;
+}
+#s9 .top { margin-bottom:60px; }
+#s9 .top .eyebrow .eyebrow-line { background:var(--yellow); }
+#s9 .top .slide-heading { margin-top:14px; font-size:72px; }
+
+#s9 .templates {
+  display:flex; flex-direction:column;
+  gap:32px; flex:1; justify-content:center;
+}
+#s9 .template-line {
+  display:flex; align-items:baseline; gap:0;
+  font-family:var(--font-body); font-size:38px; font-weight:400;
+  color:var(--ink); letter-spacing:0; line-height:1.4;
+}
+#s9 .blank {
+  display:inline-block;
+  min-width:240px;
+  border-bottom:4px solid var(--coral);
+  margin:0 6px;
+  vertical-align:baseline;
+}
+#s9 .template-line:nth-child(2) .blank { border-color:var(--teal); }
+#s9 .template-line:nth-child(3) .blank { border-color:var(--lavender); }
+#s9 .template-line:nth-child(4) .blank { border-color:var(--yellow); }
+
+/* Right decorative circle */
+#s9 .deco-circle {
+  position:absolute; right:100px; top:50%;
+  transform:translateY(-50%);
+  width:320px; height:320px;
+  border-radius:50%;
+  background:var(--yellow);
+  opacity:0.25;
+  z-index:1;
+}
+#s9 .deco-ring {
+  position:absolute; right:60px; top:50%;
+  transform:translateY(-50%);
+  width:400px; height:400px;
+  border-radius:50%;
+  border:3px solid var(--ink-10);
+  z-index:1;
+}
+
+
+/* ===========================================
+   SLIDE 10 — CLOSING
+   =========================================== */
+#s10 { background:var(--bg); }
+
+#s10 .geo-wrap {
+  position:absolute; right:0; top:0;
+  width:560px; height:1080px;
+  pointer-events:none; z-index:1;
+}
+#s10 .geo-semi {
+  position:absolute;
+  width:480px; height:480px;
+  border-radius:50%;
+  background:var(--coral);
+  opacity:0.15;
+  top:50%; right:-120px;
+  transform:translateY(-50%);
+}
+#s10 .geo-semi-solid {
+  position:absolute;
+  width:280px; height:280px;
+  border-radius:50%;
+  background:var(--coral);
+  bottom:100px; right:60px;
+}
+#s10 .geo-ring {
+  position:absolute;
+  width:340px; height:340px;
+  border-radius:50%;
+  border:3px solid var(--ink-10);
+  top:80px; right:180px;
+}
+#s10 .geo-dot {
+  position:absolute;
+  width:32px; height:32px;
+  border-radius:50%;
+  background:var(--teal);
+  top:350px; right:470px;
+}
+
+#s10 .ghost {
+  font-size:380px; bottom:-20px; left:-10px;
+}
+
+#s10 .content {
+  position:absolute;
+  left:120px; top:0;
+  width:1160px; height:1080px;
+  display:flex; flex-direction:column;
+  justify-content:center;
+  z-index:2;
+}
+
+#s10 .before-line {
+  font-family:var(--font-ko); font-size:56px;
+  color:var(--mid-gray); letter-spacing:0;
+  text-decoration:line-through;
+  text-decoration-color:var(--coral);
+  text-decoration-thickness:4px;
+  margin-bottom:24px;
+}
+
+#s10 .arrow-row {
+  display:flex; align-items:center; gap:28px;
+  margin-bottom:32px;
+}
+#s10 .arrow-icon {
+  font-size:56px; color:var(--coral);
+  line-height:1;
+}
+
+#s10 .after-line {
+  font-family:var(--font-ko); font-size:96px;
+  color:var(--ink); letter-spacing:-1px; line-height:1.1;
+}
+#s10 .after-line .hl-coral { font-size:108px; }
+
+#s10 .action-box {
+  margin-top:64px;
+  display:inline-flex; align-items:center; gap:18px;
+  padding:24px 40px;
+  border-radius:12px;
+  background:var(--ink);
+  color:white;
+  font-family:var(--font-body); font-size:30px; font-weight:500;
+  letter-spacing:0; line-height:1.5;
+  width:fit-content;
+}
+#s10 .action-box .action-dot {
+  width:12px; height:12px;
+  border-radius:50%;
+  background:var(--coral);
+  flex-shrink:0;
+}
+
+
+/* ===========================================
+   PROGRESS INDICATOR — outside stage
+   =========================================== */
+.deck-controls {
+  position:fixed;
+  bottom:24px; left:50%;
+  transform:translateX(-50%);
+  z-index:1000;
+  display:flex; align-items:center; gap:20px;
+}
+.deck-btn {
+  width:44px; height:44px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.2);
+  color:white; font-size:18px;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background 0.2s;
+  font-family:var(--font-mono);
+}
+.deck-btn:hover { background:rgba(255,255,255,0.24); }
+.deck-counter {
+  font-family:var(--font-mono); font-size:16px;
+  color:rgba(255,255,255,0.5);
+  letter-spacing:2px; min-width:60px; text-align:center;
+}
+
+/* ===========================================
+   INLINE EDITING
+   =========================================== */
+.edit-hotzone {
+  position:fixed; top:0; left:0;
+  width:80px; height:80px;
+  z-index:10000; cursor:pointer;
+}
+.edit-toggle {
+  position:fixed; top:16px; left:16px;
+  z-index:10001;
+  width:42px; height:42px;
+  border-radius:50%;
+  border:none; cursor:pointer;
+  background:rgba(0,0,0,0.6);
+  font-size:18px;
+  opacity:0; pointer-events:none;
+  transition:opacity 0.3s;
+}
+.edit-toggle.show, .edit-toggle.active {
+  opacity:1; pointer-events:auto;
+}
+[contenteditable="true"] {
+  outline:2px dashed rgba(255,94,91,0.6);
+  outline-offset:4px;
+  border-radius:4px;
+}
+
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+  <main class="deck-stage" id="deckStage">
+
+    <!-- ============================================
+         SLIDE 1 — TITLE
+         ============================================ -->
+    <section class="slide active" id="s1">
+      <div class="ghost">AI PARTY</div>
+
+      <!-- Right geometric burst -->
+      <div class="geo-wrap" aria-hidden="true">
+        <div class="geo-semi reveal-scale d0"></div>
+        <div class="geo-c1 reveal-scale d1"></div>
+        <div class="geo-sq reveal-scale d2"></div>
+        <div class="geo-c2 reveal-scale d3"></div>
+        <div class="geo-c3 reveal-scale d4"></div>
+        <div class="geo-ring reveal-scale d2"></div>
+      </div>
+
+      <div class="content">
+        <div class="eyebrow reveal-left d0">
+          <span class="eyebrow-line"></span>
+          AI Study — Final Session
+        </div>
+        <div class="title-row reveal d1">
+          <span class="t-ai">AI</span>
+          <span class="t-party">파티</span>
+        </div>
+        <p class="subtitle reveal d2">
+          우리가 배운 AI, 이제 업무에 적용하기<br>
+          스터디 회고 &amp; 결과물 발표
+        </p>
+        <div class="chip-row reveal d3">
+          <span class="chip"><span class="chip-dot" style="background:var(--coral)"></span>프롬프트</span>
+          <span class="chip"><span class="chip-dot" style="background:var(--teal)"></span>자동화</span>
+          <span class="chip"><span class="chip-dot" style="background:var(--yellow)"></span>Apps Script</span>
+          <span class="chip"><span class="chip-dot" style="background:var(--lavender)"></span>API 연결</span>
+          <span class="chip"><span class="chip-dot" style="background:var(--ink)"></span>배포</span>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================
+         SLIDE 2 — JOURNEY
+         ============================================ -->
+    <section class="slide" id="s2">
+      <div class="ghost">05</div>
+      <div class="content">
+        <div class="top">
+          <div class="eyebrow reveal-left d0">
+            <span class="eyebrow-line"></span>
+            AI Study Recap
+          </div>
+          <h2 class="slide-heading reveal d1">5주간의 스터디 여정</h2>
+        </div>
+
+        <div class="timeline">
+          <div class="t-node reveal d2">
+            <div class="t-circle">01</div>
+            <div class="t-title">프롬프트<br>비교</div>
+            <div class="t-desc">나쁜 프롬프트 vs<br>좋은 프롬프트</div>
+          </div>
+          <div class="t-node reveal d3">
+            <div class="t-circle">02</div>
+            <div class="t-title">형식<br>제어</div>
+            <div class="t-desc">표 · 체크리스트<br>이메일 · 요약문</div>
+          </div>
+          <div class="t-node reveal d4">
+            <div class="t-circle">03</div>
+            <div class="t-title">결과물<br>배포</div>
+            <div class="t-desc">PPT 제작 →<br>공유/배포</div>
+          </div>
+          <div class="t-node reveal d5">
+            <div class="t-circle">04</div>
+            <div class="t-title">Apps Script<br>자동화</div>
+            <div class="t-desc">Sheets 데이터 →<br>웹사이트</div>
+          </div>
+          <div class="t-node reveal d6">
+            <div class="t-circle">05</div>
+            <div class="t-title">외부 API<br>연결</div>
+            <div class="t-desc">API → Sheets →<br>데이터 정제</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================
+         SLIDE 3 — PROMPT QUALITY
+         ============================================ -->
+    <section class="slide" id="s3">
+      <div class="ghost">PROMPT</div>
+      <div class="top">
+        <div class="eyebrow reveal-left d0">
+          <span class="eyebrow-line"></span>
+          핵심 배움 1
+        </div>
+        <h2 class="slide-heading reveal d1">
+          프롬프트 품질이 결과 품질을 바꾼다
+        </h2>
+      </div>
+
+      <div class="compare">
+        <div class="panel panel-bad reveal d2">
+          <div class="p-label p-label-bad">
+            <div class="p-icon p-icon-bad">✕</div>
+            나쁜 프롬프트
+          </div>
+          <div class="p-prompt">"보고서 써줘"</div>
+          <div class="p-result">
+            맥락 없음 · 목적 불명확 · 형식 미지정<br>
+            → AI가 임의로 내용을 채워 결과물이 쓸모없음
+          </div>
+        </div>
+        <div class="panel panel-good reveal d3">
+          <div class="p-label p-label-good">
+            <div class="p-icon p-icon-good">✓</div>
+            좋은 프롬프트
+          </div>
+          <div class="p-prompt">"3월 영업 데이터 기반으로, 임원 보고용 요약을 300자 이내 · 핵심 3가지 · 표 형식으로 작성해줘"</div>
+          <div class="p-result">
+            대상 · 분량 · 형식 · 데이터 명시<br>
+            → AI가 정확히 원하는 결과물을 출력
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================
+         SLIDE 4 — OUTPUT FORMATS
+         ============================================ -->
+    <section class="slide" id="s4">
+      <div class="ghost">FORMAT</div>
+      <div class="top">
+        <div class="eyebrow reveal-left d0">
+          <span class="eyebrow-line"></span>
+          핵심 배움 2
+        </div>
+        <h2 class="slide-heading reveal d1">
+          같은 정보도 목적에 따라 형식이 달라진다
+        </h2>
+      </div>
+
+      <div class="cards">
+        <div class="card reveal d2">
+          <div class="card-icon">⊞</div>
+          <div class="card-name">표</div>
+          <div class="card-when">수치 비교가 필요하거나 여러 항목을 한눈에 보고 싶을 때</div>
+          <div class="card-tag">비교 · 수치</div>
+        </div>
+        <div class="card reveal d3">
+          <div class="card-icon">☑</div>
+          <div class="card-name">체크리스트</div>
+          <div class="card-when">해야 할 일을 순서대로 정리하고 실행을 추적할 때</div>
+          <div class="card-tag">실행 · 순서</div>
+        </div>
+        <div class="card reveal d4">
+          <div class="card-icon">✉</div>
+          <div class="card-name">이메일</div>
+          <div class="card-when">누군가에게 정보를 전달하거나 요청을 전해야 할 때</div>
+          <div class="card-tag">전달 · 소통</div>
+        </div>
+        <div class="card reveal d5">
+          <div class="card-icon">≡</div>
+          <div class="card-name">요약문</div>
+          <div class="card-when">긴 내용을 빠르게 파악해야 하거나 핵심만 공유할 때</div>
+          <div class="card-tag">요약 · 파악</div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================
+         SLIDE 5 — DEPLOY
+         ============================================ -->
+    <section class="slide" id="s5">
+      <div class="ghost">DEPLOY</div>
+      <div class="top">
+        <div class="eyebrow reveal-left d0">
+          <span class="eyebrow-line"></span>
+          핵심 배움 3
+        </div>
+        <h2 class="slide-heading reveal d1">
+          AI 결과물은 배포되어야 가치가 생긴다
+        </h2>
+      </div>
+
+      <div class="flow">
+        <div class="flow-box reveal d2">
+          <div class="fb-num">1</div>
+          <div class="fb-title">PPT 제작</div>
+          <div class="fb-desc">AI로 초안 생성<br>내용 구성 · 디자인</div>
+        </div>
+        <div class="flow-arrow reveal d3">
+          <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 28H44M44 28L30 14M44 28L30 42" stroke="#6B7280" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="flow-box reveal d3">
+          <div class="fb-num">2</div>
+          <div class="fb-title">정리 · 수정</div>
+          <div class="fb-desc">내용 검토<br>맥락 맞게 편집</div>
+        </div>
+        <div class="flow-arrow reveal d4">
+          <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 28H44M44 28L30 14M44 28L30 42" stroke="#6B7280" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="flow-box reveal d4">
+          <div class="fb-num">3</div>
+          <div class="fb-title">공유 · 배포</div>
+          <div class="fb-desc">링크로 팀과 공유<br>실제 업무에 활용</div>
+        </div>
+      </div>
+
+      <div class="insight reveal d5">
+        만드는 것에서 멈추지 않고, <strong>누군가에게 닿을 때</strong> 가치가 완성된다
+      </div>
+    </section>
+
+
+    <!-- ============================================
+         SLIDE 6 — APPS SCRIPT
+         ============================================ -->
+    <section class="slide" id="s6">
+      <div class="ghost">AUTO</div>
+      <div class="top">
+        <div class="eyebrow reveal-left d0">
+          <span class="eyebrow-line"></span>
+          핵심 배움 4
+        </div>
+        <h2 class="slide-heading reveal d1">Google Sheets + Apps Script로 업무 도구 만들기</h2>
+        <p class="subtitle reveal d2">코딩 없이도 데이터를 웹사이트로 바꿀 수 있다</p>
+      </div>
+
+      <div class="pillars">
+        <div class="pillar reveal d2">
+          <div class="pillar-head">
+            <div class="pillar-label">STEP 01</div>
+            <div class="pillar-title">데이터</div>
+          </div>
+          <div class="pillar-body">
+            <ul>
+              <li>Google Sheets에 정보 정리</li>
+              <li>구조화된 형태로 저장</li>
+              <li>시트가 곧 데이터베이스</li>
+            </ul>
+          </div>
+        </div>
+        <div class="pillar reveal d3">
+          <div class="pillar-head">
+            <div class="pillar-label">STEP 02</div>
+            <div class="pillar-title">자동화</div>
+          </div>
+          <div class="pillar-body">
+            <ul>
+              <li>Apps Script로 로직 작성</li>
+              <li>AI가 코드 초안 생성</li>
+              <li>트리거로 자동 실행</li>
+            </ul>
+          </div>
+        </div>
+        <div class="pillar reveal d4">
+          <div class="pillar-head">
+            <div class="pillar-label">STEP 03</div>
+            <div class="pillar-title">웹사이트 / 도구</div>
+          </div>
+          <div class="pillar-body">
+            <ul>
+              <li>Web App으로 배포</li>
+              <li>링크 하나로 누구나 접근</li>
+              <li>데이터 변경 시 자동 반영</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================
+         SLIDE 7 — API INTEGRATION
+         ============================================ -->
+    <section class="slide" id="s7">
+      <div class="ghost">API</div>
+      <div class="top">
+        <div class="eyebrow reveal-left d0">
+          <span class="eyebrow-line"></span>
+          핵심 배움 5
+        </div>
+        <h2 class="slide-heading reveal d1">외부 API 연결과 데이터 정제</h2>
+      </div>
+
+      <div class="flow">
+        <div class="step reveal d2">
+          <div class="step-num">1</div>
+          <div class="step-title">API 요청</div>
+          <div class="step-desc">외부 서비스에서<br>필요한 데이터 가져오기</div>
+        </div>
+        <div class="step-arrow reveal d3">
+          <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 28H44M44 28L30 14M44 28L30 42" stroke="#D1D5DB" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="step reveal d3">
+          <div class="step-num">2</div>
+          <div class="step-title">Sheets 저장</div>
+          <div class="step-desc">Apps Script로<br>Sheets에 자동 저장</div>
+        </div>
+        <div class="step-arrow reveal d4">
+          <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 28H44M44 28L30 14M44 28L30 42" stroke="#D1D5DB" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="step reveal d4">
+          <div class="step-num">3</div>
+          <div class="step-title">필터링 · 정제</div>
+          <div class="step-desc">필요한 정보만<br>추출하고 가공</div>
+        </div>
+        <div class="step-arrow reveal d5">
+          <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 28H44M44 28L30 14M44 28L30 42" stroke="#D1D5DB" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="step reveal d5">
+          <div class="step-num">4</div>
+          <div class="step-title">보기 좋은<br>결과물</div>
+          <div class="step-desc">대시보드 · 웹페이지로<br>시각화 · 공유</div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================
+         SLIDE 8 — PRESENTATION GUIDE
+         ============================================ -->
+    <section class="slide" id="s8">
+      <div class="ghost">GUIDE</div>
+      <div class="top">
+        <div class="eyebrow reveal-left d0">
+          <span class="eyebrow-line"></span>
+          AI Party
+        </div>
+        <h2 class="slide-heading reveal d1">발표 가이드 — 각자 5분씩 공유해요</h2>
+      </div>
+
+      <div class="guide-list">
+        <div class="guide-item reveal d2">
+          <div class="gi-num">1</div>
+          <div class="gi-title">업무 문제</div>
+          <div class="gi-desc">어떤 불편함이나 비효율을 해결하고 싶었나요?</div>
+        </div>
+        <div class="guide-item reveal d3">
+          <div class="gi-num">2</div>
+          <div class="gi-title">만든 결과물</div>
+          <div class="gi-desc">AI를 활용해서 무엇을 만들었나요?</div>
+        </div>
+        <div class="guide-item reveal d4">
+          <div class="gi-num">3</div>
+          <div class="gi-title">AI 활용 방식</div>
+          <div class="gi-desc">어떤 방식으로 AI를 사용했나요?</div>
+        </div>
+        <div class="guide-item reveal d5">
+          <div class="gi-num">4</div>
+          <div class="gi-title">업무 적용 효과</div>
+          <div class="gi-desc">실제 업무에 적용하면 어떤 효과가 예상되나요?</div>
+        </div>
+        <div class="guide-item reveal d6">
+          <div class="gi-num">5</div>
+          <div class="gi-title">다음 개선점</div>
+          <div class="gi-desc">더 발전시키고 싶은 부분이 있다면?</div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================
+         SLIDE 9 — PRESENTATION TEMPLATE
+         ============================================ -->
+    <section class="slide" id="s9">
+      <div class="ghost">YOURS</div>
+      <div class="deco-circle"></div>
+      <div class="deco-ring"></div>
+
+      <div class="content">
+        <div class="top">
+          <div class="eyebrow reveal-left d0">
+            <span class="eyebrow-line"></span>
+            발표 템플릿
+          </div>
+          <h2 class="slide-heading reveal d1">빈칸을 채워 발표해 보세요</h2>
+        </div>
+
+        <div class="templates">
+          <div class="template-line reveal d2">
+            제가 만든 것은 <span class="blank"></span> 입니다.
+          </div>
+          <div class="template-line reveal d3">
+            해결하려는 업무 문제는 <span class="blank"></span> 입니다.
+          </div>
+          <div class="template-line reveal d4">
+            AI를 활용한 부분은 <span class="blank"></span> 입니다.
+          </div>
+          <div class="template-line reveal d5">
+            실제 업무에 적용하면 <span class="blank"></span> 효과가 있습니다.
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================
+         SLIDE 10 — CLOSING
+         ============================================ -->
+    <section class="slide" id="s10">
+      <div class="ghost">NEXT</div>
+
+      <div class="geo-wrap" aria-hidden="true">
+        <div class="geo-semi reveal-scale d0"></div>
+        <div class="geo-semi-solid reveal-scale d1"></div>
+        <div class="geo-ring reveal-scale d2"></div>
+        <div class="geo-dot reveal-scale d3"></div>
+      </div>
+
+      <div class="content">
+        <div class="eyebrow reveal-left d0">
+          <span class="eyebrow-line" style="background:var(--coral)"></span>
+          마무리
+        </div>
+
+        <p class="before-line reveal d1">"AI를 써봤다"</p>
+        <div class="arrow-row reveal d2">
+          <span class="arrow-icon">↓</span>
+        </div>
+        <p class="after-line reveal d3">
+          "AI로 업무<br>방식을 <span class="hl-coral">바꿨다</span>"
+        </p>
+
+        <div class="action-box reveal d4">
+          <span class="action-dot"></span>
+          다음 액션: 하나의 업무에 바로 적용하기
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Navigation controls -->
+<nav class="deck-controls" aria-label="슬라이드 탐색">
+  <button class="deck-btn" id="btnPrev" aria-label="이전 슬라이드">←</button>
+  <span class="deck-counter" id="slideCounter">1 / 10</span>
+  <button class="deck-btn" id="btnNext" aria-label="다음 슬라이드">→</button>
+</nav>
+
+<!-- Inline editing -->
+<div class="edit-hotzone" id="editHotzone" aria-hidden="true"></div>
+<button class="edit-toggle" id="editToggle" title="편집 모드 (E키)">✏️</button>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   =========================================== */
+class SlidePresentation {
+  constructor() {
+    this.slides = document.querySelectorAll('.slide');
+    this.current = 0;
+    this.stage = document.getElementById('deckStage');
+    this.counter = document.getElementById('slideCounter');
+    this.total = this.slides.length;
+
+    this.scaleStage();
+    window.addEventListener('resize', () => this.scaleStage());
+
+    this.showSlide(0);
+
+    this.setupKeyboard();
+    this.setupTouch();
+    this.setupMouse();
+
+    document.getElementById('btnPrev').addEventListener('click', () => this.prev());
+    document.getElementById('btnNext').addEventListener('click', () => this.next());
+  }
+
+  scaleStage() {
+    const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    const tx = (window.innerWidth  - 1920 * factor) / 2;
+    const ty = (window.innerHeight - 1080 * factor) / 2;
+    this.stage.style.transform = `translate(${tx}px,${ty}px) scale(${factor})`;
+  }
+
+  showSlide(index) {
+    this.current = Math.max(0, Math.min(index, this.total - 1));
+    this.slides.forEach((slide, i) => {
+      const active = i === this.current;
+      slide.classList.toggle('active', active);
+      /* Trigger reveal on next frame so transition fires */
+      if (active) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => slide.classList.add('visible'));
+        });
+      } else {
+        slide.classList.remove('visible');
+      }
+    });
+    this.counter.textContent = `${this.current + 1} / ${this.total}`;
+  }
+
+  next() { this.showSlide(this.current + 1); }
+  prev() { this.showSlide(this.current - 1); }
+
+  setupKeyboard() {
+    document.addEventListener('keydown', (e) => {
+      if (e.target.getAttribute('contenteditable')) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault(); this.next();
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+        e.preventDefault(); this.prev();
+      } else if (e.key === 'Home') { this.showSlide(0); }
+      else if (e.key === 'End')  { this.showSlide(this.total - 1); }
+      else if (e.key === 'e' || e.key === 'E') { editor.toggle(); }
+    });
+  }
+
+  setupTouch() {
+    let startX = 0, startY = 0;
+    this.stage.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+    this.stage.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = e.changedTouches[0].clientY - startY;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+        dx < 0 ? this.next() : this.prev();
+      }
+    });
+  }
+
+  setupMouse() {
+    this.stage.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.deltaY > 0) this.next(); else this.prev();
+    }, { passive: false });
+  }
+}
+
+/* ===========================================
+   INLINE EDITOR
+   =========================================== */
+class InlineEditor {
+  constructor() {
+    this.isActive = false;
+    this.editables = [];
+  }
+
+  toggle() {
+    this.isActive ? this.deactivate() : this.activate();
+  }
+
+  activate() {
+    this.isActive = true;
+    document.getElementById('editToggle').classList.add('active');
+    document.querySelectorAll('.slide').forEach(slide => {
+      slide.querySelectorAll('h1,h2,h3,p,.t-title,.t-desc,.fb-title,.fb-desc,.card-name,.card-when,.gi-title,.gi-desc,.step-title,.step-desc,.pillar-title,.before-line,.after-line,.template-line,.p-prompt,.p-result,.subtitle,.insight,.action-box').forEach(el => {
+        el.setAttribute('contenteditable', 'true');
+        el.setAttribute('spellcheck', 'false');
+      });
+    });
+  }
+
+  deactivate() {
+    this.isActive = false;
+    document.getElementById('editToggle').classList.remove('active', 'show');
+    document.querySelectorAll('[contenteditable]').forEach(el => {
+      el.removeAttribute('contenteditable');
+    });
+    /* Save to localStorage */
+    localStorage.setItem('aiparty-deck', document.getElementById('deckStage').innerHTML);
+  }
+}
+
+/* ===========================================
+   INIT
+   =========================================== */
+const editor = new InlineEditor();
+const presentation = new SlidePresentation();
+
+/* Restore saved edits */
+const saved = localStorage.getItem('aiparty-deck');
+if (saved) {
+  /* Don't restore on first view — presenter can clear storage to reset */
+}
+
+/* Edit hotzone hover */
+const hotzone  = document.getElementById('editHotzone');
+const editBtn  = document.getElementById('editToggle');
+let hideTimer  = null;
+
+hotzone.addEventListener('mouseenter', () => {
+  clearTimeout(hideTimer);
+  editBtn.classList.add('show');
+});
+hotzone.addEventListener('mouseleave', () => {
+  hideTimer = setTimeout(() => {
+    if (!editor.isActive) editBtn.classList.remove('show');
+  }, 400);
+});
+editBtn.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+editBtn.addEventListener('mouseleave', () => {
+  hideTimer = setTimeout(() => {
+    if (!editor.isActive) editBtn.classList.remove('show');
+  }, 400);
+});
+hotzone.addEventListener('click', () => editor.toggle());
+editBtn.addEventListener('click', () => editor.toggle());
+
+</script>
+</body>
+</html>
